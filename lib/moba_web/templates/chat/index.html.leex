@@ -14,7 +14,7 @@
             <i class="fa fa-times text-white"></i>
         </a>
         <h4 class="m-0 text-white text-center">
-            <a href="https://discord.gg/wA3JxVU" target="_blank" class="text-white">
+            <a href="https://discord.gg/QNwEdPS" target="_blank" class="text-white">
                 <i class="fab fa-discord" style="font-size: 1.5rem"></i>
                 <br/>
                 Join our Discord!
@@ -61,10 +61,6 @@
         <%=render("_message_alert.html", alert: alert)%>
     <% end %>
 </div>
-
-<%= for alert <- battle_alerts(@alerts) do %>
-    <%=render("_battle_alert.html", alert: alert, socket: @socket)%>
-<% end %>
 
 <%= if @challenge do %>
     <div phx-hook="<%=if @challenge.challenger, do: "DuelChallenger", else: "DuelChallenged"%>" id="duel-challenge" data-other="<%=@challenge.other.username%>"/>

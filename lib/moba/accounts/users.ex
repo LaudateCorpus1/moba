@@ -13,13 +13,13 @@ defmodule Moba.Accounts.Users do
   # -------------------------------- PUBLIC API
 
   def get!(nil), do: nil
-  def get!(id), do: Repo.get!(User, id)
+  def get!(id), do: Repo.get!(UserQuery.load(), id)
 
   def get_with_unlocks!(id), do: get!(id) |> Repo.preload(:unlocks)
 
   def get_with_current_heroes!(id), do: get!(id) |> Repo.preload(current_pve_hero: :avatar, current_pvp_hero: :avatar)
 
-  def get_by_username(username), do: Repo.get_by(User, username: username)
+  def get_by_username(username), do: Repo.get_by(UserQuery.load(), username: username)
 
   def create(attrs \\ %{}) do
     %User{}
@@ -139,7 +139,7 @@ defmodule Moba.Accounts.Users do
   @doc """
   Lists Users by their ranking
   """
-  def ranking(limit), do: UserQuery.ranking(limit) |> Repo.all()
+  def ranking(limit), do: UserQuery.ranking(limit) |> UserQuery.load() |> Repo.all()
 
   @doc """
   Updates all Users' ranking by their medal_count and XP
@@ -156,14 +156,6 @@ defmodule Moba.Accounts.Users do
   end
 
   @doc """
-  Updates all Users' shard_limit to the default daily amount
-  """
-  def reset_shard_limits! do
-    limit = Moba.shard_limit()
-    Repo.update_all(UserQuery.non_guests(), set: [shard_limit: limit])
-  end
-
-  @doc """
   Grabs users with rankings close to the target user
   """
   def search(%{ranking: ranking}) when not is_nil(ranking) do
@@ -174,7 +166,8 @@ defmodule Moba.Accounts.Users do
         {ranking - 4, ranking + 4}
       end
 
-    UserQuery.non_bots()
+    UserQuery.load()
+    |> UserQuery.non_bots()
     |> UserQuery.non_guests()
     |> UserQuery.by_ranking(min, max)
     |> Repo.all()
@@ -186,6 +179,7 @@ defmodule Moba.Accounts.Users do
       |> UserQuery.non_guests()
       |> UserQuery.by_level(level)
       |> UserQuery.limit_by(9)
+      |> UserQuery.load()
       |> Repo.all()
 
     [user] ++ Enum.filter(by_level, &(&1.id != id))
@@ -221,31 +215,8 @@ defmodule Moba.Accounts.Users do
     end
   end
 
-  def finish_pve!(user, hero_collection, shards) do
-    update!(user, %{
-      hero_collection: hero_collection,
-      shard_count: user.shard_count + shards,
-      shard_limit: user.shard_limit - shards
-    })
-  end
-
-  def pve_shards_for(%{shard_limit: shard_limit}, league_tier) do
-    reward =
-      case league_tier do
-        6 -> 100
-        5 -> 50
-        4 -> 40
-        3 -> 30
-        2 -> 20
-        1 -> 10
-        _ -> 0
-      end
-
-    if shard_limit - reward >= 0 do
-      reward
-    else
-      shard_limit
-    end
+  def finish_pve!(user, hero_collection) do
+    update!(user, %{hero_collection: hero_collection})
   end
 
   def increment_unread_messages_count_for_all_online_except(user) do
@@ -266,8 +237,6 @@ defmodule Moba.Accounts.Users do
     diff = Moba.user_level_xp() - xp
 
     if diff <= 0 do
-      # broadcast_level_up(data.id, current_level)
-
       changeset
       |> User.level_up(current_level, diff * -1)
       |> check_if_leveled()
@@ -275,13 +244,6 @@ defmodule Moba.Accounts.Users do
       changeset
     end
   end
-
-  # This alert shows up as soon as the user levels up during a PVE battle
-  defp broadcast_level_up(user_id, current_level) do
-    MobaWeb.broadcast("user-#{user_id}", "alert", level_up_alert(current_level))
-  end
-
-  defp level_up_alert(current_level), do: %{level: current_level + 1, type: "battle"}
 
   defp mininum_season_points_for(%{medal_count: medals}), do: medals * Moba.season_points_per_medal()
 end

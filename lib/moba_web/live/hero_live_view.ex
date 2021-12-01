@@ -3,13 +3,36 @@ defmodule MobaWeb.HeroLiveView do
 
   def mount(_, %{"user_id" => user_id} = session, socket) do
     socket = assign_new(socket, :current_user, fn -> Accounts.get_user!(user_id) end)
+    user = socket.assigns.current_user
     hero_id = Map.get(session, "hero_id")
     hero = hero_id && Game.get_hero!(hero_id)
 
-    collection_codes = Enum.map(socket.assigns.current_user.hero_collection, & &1["code"])
-    blank_collection = Game.list_avatars() |> Enum.filter(&(&1.code not in collection_codes))
+    avatars = Game.list_avatars()
+    collection_codes = Enum.map(user.hero_collection, & &1["code"])
+    blank_collection = Enum.filter(avatars, &(&1.code not in collection_codes))
+    completed_progressions = Game.last_completed_quest_progressions(hero)
+    completed_season_progression = completed_progressions && Enum.find(completed_progressions, &(&1.quest.code == "season"))
+    completed_daily_progressions = completed_progressions && Enum.filter(completed_progressions, & &1.quest.daily)
 
-    {:ok, assign(socket, current_hero: hero, blank_collection: blank_collection)}
+    completed_achievement_progressions = completed_progressions && Enum.filter(completed_progressions, &(not &1.quest.daily and &1.quest.code != "season"))
+
+    tab_display = tab_display_priority(completed_season_progression, completed_daily_progressions)
+
+    {:ok,
+     assign(socket,
+       avatars: avatars,
+       current_hero: hero,
+       blank_collection: blank_collection,
+       completed_progressions: completed_progressions,
+       completed_season_progression: completed_season_progression,
+       completed_daily_progressions: completed_daily_progressions,
+       completed_achievement_progressions: completed_achievement_progressions,
+       tab_display: tab_display
+     )}
+  end
+
+  def handle_event("tab-display", %{"display" => display}, socket) do
+    {:noreply, assign(socket, tab_display: display)}
   end
 
   def handle_info({"hero", %{id: id}}, socket) do
@@ -29,5 +52,13 @@ defmodule MobaWeb.HeroLiveView do
 
   def render(assigns) do
     MobaWeb.HeroView.render("show.html", assigns)
+  end
+
+  defp tab_display_priority(season, daily) do
+    cond do
+      season -> "season"
+      daily -> "daily"
+      true -> "achievement"
+    end
   end
 end

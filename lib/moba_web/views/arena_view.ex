@@ -26,22 +26,24 @@ defmodule MobaWeb.ArenaView do
     end
   end
 
-  def next_round_description do
+  def next_round_description(show_label \\ true) do
     match = Game.current_match()
     created = Timex.shift(match.inserted_at, hours: 1)
 
-    label = if Timex.before?(match.last_pvp_round_at, created) do
-      "Next round"
-    else
-      "Next match"
-    end
+    label =
+      if Timex.before?(match.last_pvp_round_at, created) do
+        "Next round"
+      else
+        "Next match"
+      end
 
-    time = match.last_pvp_round_at
+    time =
+      match.last_pvp_round_at
       |> Timex.shift(hours: Moba.pvp_round_timeout_in_hours())
       |> Timex.format("{relative}", :relative)
       |> elem(1)
 
-    "#{label} #{time}"
+    (show_label && "#{label} #{time}") || time
   end
 
   def can_join_grandmaster?(heroes), do: Enum.find(heroes, &(&1.league_tier == Moba.max_league_tier()))

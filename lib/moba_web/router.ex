@@ -71,7 +71,7 @@ defmodule MobaWeb.Router do
 
     live "/library", LibraryLiveView
 
-    live "/create", CreateLiveView, layout: {MobaWeb.LayoutView, :clean}
+    live "/invoke", CreateLiveView, layout: {MobaWeb.LayoutView, :clean}
 
     post "/game/continue", GameController, :continue
     get "/game/:mode", GameController, :switch_mode
@@ -102,6 +102,7 @@ defmodule MobaWeb.Router do
     resources "/users", Admin.UserController
     resources "/matches", Admin.MatchController
     resources "/skins", Admin.SkinController
+    resources "/quests", Admin.QuestController
 
     live_dashboard "/dashboard", metrics: MobaWeb.Telemetry
 

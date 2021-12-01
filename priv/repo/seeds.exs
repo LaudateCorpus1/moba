@@ -11,7 +11,7 @@
 # and so on) as they will fail if something goes wrong.
 
 alias Moba.{Repo, Game, Accounts, Admin}
-alias Game.Schema.{Item, Skill, Avatar}
+alias Game.Schema.{Item, Skill, Avatar, Quest}
 alias Accounts.Schema.User
 
 defmodule SeedHelper do
@@ -1201,6 +1201,45 @@ end)
 Repo.update_all(Item, set: [current: true])
 Repo.update_all(Skill, set: [current: true])
 Repo.update_all(Avatar, set: [current: true])
+
+Repo.insert(%Quest{code: "season", level: 1, shard_prize: 100, initial_value: 0, final_value: 2})
+Repo.insert(%Quest{code: "season", level: 2, shard_prize: 150, initial_value: 0, final_value: 5})
+Repo.insert(%Quest{code: "season", level: 3, shard_prize: 200, initial_value: 0, final_value: 10})
+Repo.insert(%Quest{code: "season", level: 4, shard_prize: 250, initial_value: 0, final_value: 15})
+
+Repo.insert(%Quest{code: "daily_master", level: 1, shard_prize: 100, initial_value: 0, final_value: 1, daily: true})
+
+Repo.insert(%Quest{code: "daily_grandmaster", level: 1, shard_prize: 100, initial_value: 0, final_value: 1, daily: true})
+
+Repo.insert(%Quest{code: "daily_perfect", level: 1, shard_prize: 100, initial_value: 0, final_value: 1, daily: true})
+
+Repo.insert(%Quest{code: "daily_arena_easy", level: 1, shard_prize: 100, initial_value: 0, final_value: 1, daily: true})
+
+Repo.insert(%Quest{
+  code: "daily_arena_medium",
+  level: 1,
+  shard_prize: 100,
+  initial_value: 0,
+  final_value: 1,
+  daily: true
+})
+
+Repo.insert(%Quest{code: "daily_arena_hard", level: 1, shard_prize: 100, initial_value: 0, final_value: 1, daily: true})
+
+Repo.insert(%Quest{code: "grandmaster_first", level: 1, shard_prize: 100, initial_value: 0, final_value: 1})
+Repo.insert(%Quest{code: "grandmaster_all", level: 1, shard_prize: 100, initial_value: 0, final_value: 20})
+Repo.insert(%Quest{code: "grandmaster_perfect", level: 1, shard_prize: 100, initial_value: 0, final_value: 1})
+Repo.insert(%Quest{code: "grandmaster_grail", level: 1, shard_prize: 100, initial_value: 0, final_value: 20})
+Repo.insert(%Quest{code: "grandmaster_carry", level: 1, shard_prize: 100, initial_value: 0, final_value: 6})
+Repo.insert(%Quest{code: "grandmaster_bruiser", level: 1, shard_prize: 100, initial_value: 0, final_value: 3})
+Repo.insert(%Quest{code: "grandmaster_tank", level: 1, shard_prize: 100, initial_value: 0, final_value: 3})
+Repo.insert(%Quest{code: "grandmaster_nuker", level: 1, shard_prize: 100, initial_value: 0, final_value: 6})
+Repo.insert(%Quest{code: "grandmaster_support", level: 1, shard_prize: 100, initial_value: 0, final_value: 2})
+
+Repo.insert(%Quest{code: "arena_grandmaster", level: 1, shard_prize: 100, initial_value: 0, final_value: 1})
+Repo.insert(%Quest{code: "arena_grandmaster_all", level: 2, shard_prize: 100, initial_value: 0, final_value: 20})
+Repo.insert(%Quest{code: "arena_podium", level: 1, shard_prize: 100, initial_value: 0, final_value: 1})
+Repo.insert(%Quest{code: "arena_podium_all", level: 2, shard_prize: 100, initial_value: 0, final_value: 20})
 
 Moba.start!()
 

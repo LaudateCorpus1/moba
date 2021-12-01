@@ -11,10 +11,15 @@ defmodule Moba.Game.Query.HeroQuery do
 
   @pvp_per_page Moba.pvp_heroes_per_page()
   @ranking_per_page Moba.ranking_heroes_per_page()
+  @current_ranking_date Timex.parse!("24-11-2021", "%d-%m-%Y", :strftime)
 
   def load(queryable \\ Hero) do
     queryable
     |> preload([:items, :avatar, :skin, :user, active_build: [skills: ^SkillQuery.ordered()]])
+  end
+
+  def load_avatar(queryable \\ Hero) do
+    preload(queryable, [:avatar])
   end
 
   def current_arena_players do
@@ -22,13 +27,13 @@ defmodule Moba.Game.Query.HeroQuery do
   end
 
   def current_arena_bots(league_tier) do
-    bots() |> pvp_active() |> by_league_tier(league_tier)
+    bots() |> pvp_active() |> with_league_tier(league_tier)
   end
 
   def pvp_search(exclude_list, filter, pvp_points, league_tier, sort, page) do
     Hero
     |> pvp_active()
-    |> by_league_tier(league_tier)
+    |> with_league_tier(league_tier)
     |> exclude_ids(exclude_list)
     |> pvp_filter(filter, pvp_points)
     |> pvp_sort(sort)
@@ -64,7 +69,7 @@ defmodule Moba.Game.Query.HeroQuery do
   end
 
   def latest(user_id) do
-    base = Hero |> by_user(user_id)
+    base = Hero |> with_user(user_id)
 
     from(hero in base,
       limit: 50,
@@ -74,7 +79,7 @@ defmodule Moba.Game.Query.HeroQuery do
   end
 
   def eligible_for_pvp(user_id) do
-    from(hero in by_user(Hero, user_id),
+    from(hero in with_user(Hero, user_id),
       limit: 50,
       order_by: [desc: [hero.pvp_picks, hero.id]],
       where: hero.finished_pve == true,
@@ -96,7 +101,7 @@ defmodule Moba.Game.Query.HeroQuery do
   end
 
   def pvp_last_picked(user_id) do
-    base = by_user(Hero, user_id) |> pvp_inactive()
+    base = with_user(Hero, user_id) |> pvp_inactive()
 
     from(hero in base,
       order_by: [desc: hero.pvp_last_picked],
@@ -138,6 +143,10 @@ defmodule Moba.Game.Query.HeroQuery do
       where: not is_nil(hero.bot_difficulty)
   end
 
+  def pve_bots(query \\ bots()) do
+    from hero in query, where: is_nil(hero.user_id)
+  end
+
   def by_difficulty(query, difficulty) do
     from hero in query,
       where: hero.bot_difficulty == ^difficulty
@@ -149,14 +158,9 @@ defmodule Moba.Game.Query.HeroQuery do
       where: hero.level <= ^last
   end
 
-  def by_user(query, user_id) do
+  def with_user(query, user_id) do
     from hero in query,
       where: hero.user_id == ^user_id
-  end
-
-  def by_users(query, user_ids) do
-    from hero in query,
-      where: hero.user_id in ^user_ids
   end
 
   def by_pvp_points(query, min, max) do
@@ -165,9 +169,14 @@ defmodule Moba.Game.Query.HeroQuery do
       where: hero.pvp_points <= ^max
   end
 
-  def by_league_tier(query, league_tier) do
+  def with_league_tier(query, league_tier) do
     from hero in query,
       where: hero.league_tier == ^league_tier
+  end
+
+  def with_league_tiers(query, league_tiers) do
+    from hero in query,
+      where: hero.league_tier in ^league_tiers
   end
 
   def by_codes(query, codes) do
@@ -197,12 +206,16 @@ defmodule Moba.Game.Query.HeroQuery do
       offset: ^offset
   end
 
+  def with_perfect_finish(query) do
+    from hero in query, where: hero.total_farm == ^Moba.maximum_total_farm()
+  end
+
   def random(query) do
     from hero in query,
       order_by: fragment("RANDOM()")
   end
 
-  def unarchived(query) do
+  def unarchived(query \\ Hero) do
     from hero in query,
       where: is_nil(hero.archived_at)
   end
@@ -221,11 +234,8 @@ defmodule Moba.Game.Query.HeroQuery do
     from hero in query, where: hero.summoned == false
   end
 
-  def year_to_date(query \\ Hero) do
-    start = Timex.now() |> Timex.beginning_of_year()
-
-    from hero in query,
-      where: hero.inserted_at > ^start
+  def in_current_ranking_date(query \\ Hero) do
+    from hero in query, where: hero.inserted_at > ^@current_ranking_date
   end
 
   def pvp_ranked(query \\ Hero) do
@@ -314,8 +324,12 @@ defmodule Moba.Game.Query.HeroQuery do
     from(hero in query, where: hero.inserted_at > ^ago)
   end
 
-  def with_avatar_ids(avatar_ids) do
-    from hero in Hero, where: hero.avatar_id in ^avatar_ids
+  def with_avatar_ids(query, avatar_ids) do
+    from hero in query, where: hero.avatar_id in ^avatar_ids
+  end
+
+  def created_before(query, time) do
+    from hero in query, where: hero.inserted_at < ^time
   end
 
   defp page_to_offset(page, per_page) do

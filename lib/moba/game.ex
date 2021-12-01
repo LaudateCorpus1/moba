@@ -8,7 +8,7 @@ defmodule Moba.Game do
   """
 
   alias Moba.{Repo, Game, Accounts}
-  alias Game.{Heroes, Matches, Leagues, Targets, Items, Skills, Avatars, Builds, ArenaPicks, Skins, Duels}
+  alias Game.{Heroes, Matches, Leagues, Targets, Items, Skills, Avatars, Builds, ArenaPicks, Skins, Duels, Quests}
 
   # MATCHES
 
@@ -47,8 +47,8 @@ defmodule Moba.Game do
   """
   def create_hero!(attrs, user, avatar, skills) do
     attrs =
-      if Map.get(attrs, :easy_mode) do
-        Map.merge(attrs, %{pve_battles_available: 1000})
+      if user && user.pve_tier == 4 do
+        Map.put(attrs, :refresh_targets_count, Moba.refresh_targets_count())
       else
         attrs
       end
@@ -67,7 +67,7 @@ defmodule Moba.Game do
   end
 
   def create_pvp_bot_hero!(user, avatar) do
-    difficulty = if user.bot_tier == Moba.master_league_tier(), do: "master", else: "grandmaster"
+    difficulty = if user.bot_tier == Moba.master_league_tier(), do: "pvp_master", else: "pvp_grandmaster"
     Heroes.create_bot!(avatar, 25, difficulty, user, 0, user.bot_tier)
   end
 
@@ -119,6 +119,14 @@ defmodule Moba.Game do
     end
   end
 
+  def refresh_targets!(%{refresh_targets_count: count} = hero) when count > 0 do
+    generate_targets!(hero)
+
+    update_hero!(hero, %{refresh_targets_count: count - 1})
+  end
+
+  def refresh_targets!(hero), do: hero
+
   def master_league?(%{league_tier: tier}), do: tier == Moba.master_league_tier()
   def max_league?(%{league_tier: tier}), do: tier == Moba.max_league_tier()
 
@@ -144,7 +152,7 @@ defmodule Moba.Game do
 
   def update_pve_ranking!, do: Heroes.update_pve_ranking!()
 
-  def redeem_league!(hero), do: Heroes.redeem_league!(hero)
+  defdelegate prepare_league_challenge!(hero), to: Heroes
 
   def level_cheat(hero), do: Heroes.level_cheat(hero)
 
@@ -157,8 +165,8 @@ defmodule Moba.Game do
   def veteran_hero?(%{easy_mode: true}), do: false
   def veteran_hero?(_), do: true
 
-  def maybe_generate_boss(%{pve_battles_available: 0, boss_id: nil, pve_points: points} = hero) do
-    if master_league?(hero) && points == Moba.pve_points_limit() do
+  def maybe_generate_boss(%{pve_battles_available: 0, boss_id: nil} = hero) do
+    if master_league?(hero) do
       generate_boss!(hero)
     else
       hero
@@ -167,8 +175,10 @@ defmodule Moba.Game do
 
   def maybe_generate_boss(hero), do: hero
 
-  def maybe_finish_pve(%{pve_battles_available: 0, pve_points: points, boss_id: nil, finished_pve: false, finished_at: nil} = hero) do
-    if max_league?(hero) || points < Moba.pve_points_limit() do
+  def maybe_finish_pve(
+        %{pve_battles_available: 0, dead: dead, boss_id: nil, finished_pve: false, finished_at: nil} = hero
+      ) do
+    if max_league?(hero) || dead do
       finish_pve!(hero)
     else
       hero
@@ -179,11 +189,13 @@ defmodule Moba.Game do
 
   def finish_pve!(%{finished_pve: false, finished_at: nil} = hero) do
     hero = Repo.preload(hero, :user)
-    shards = Accounts.pve_shards_for(hero.user, hero.league_tier)
-    updated = update_hero!(hero, %{finished_pve: true, finished_at: Timex.now(), shards_reward: shards})
+    updated = update_hero!(hero, %{finished_pve: true, finished_at: Timex.now()})
 
     collection = Heroes.collection_for(updated.user_id)
-    Accounts.finish_pve!(updated.user, collection, shards)
+    Accounts.finish_pve!(updated.user, collection)
+
+    track_pve_quests(updated)
+
     updated
   end
 
@@ -212,7 +224,7 @@ defmodule Moba.Game do
     update_hero!(hero, %{dead: true})
   end
 
-  def finalize_boss!(_, _, hero), do: update_hero!(hero, %{boss_id: nil, pve_points: Moba.pve_points_limit() - 1})
+  def finalize_boss!(_, _, hero), do: update_hero!(hero, %{boss_id: nil})
 
   defdelegate buyback!(hero), to: Heroes
   defdelegate buyback_price(hero), to: Heroes
@@ -409,4 +421,28 @@ defmodule Moba.Game do
     MobaWeb.broadcast("user-#{user_id}", "challenge", attrs)
     MobaWeb.broadcast("user-#{opponent_id}", "challenge", attrs)
   end
+
+  # QUESTS
+
+  def track_pve_quests(hero), do: Quests.track_pve(hero)
+
+  def track_daily_pvp_quests(hero), do: Quests.track_daily_pvp(hero)
+
+  def track_achievement_pvp_quests(hero), do: Quests.track_achievement_pvp(hero)
+
+  def active_quest_progression?(progressions), do: Enum.find(progressions, &is_nil(&1.completed_at))
+
+  def last_completed_quest_progressions(hero), do: Quests.last_completed_progressions(hero)
+
+  def list_quest_progressions(user_id, code \\ nil), do: Quests.list_progressions_by_code(user_id, code)
+
+  def list_title_quest_progressions(user_id), do: Quests.list_title_progressions(user_id)
+
+  def generate_daily_quest_progressions!(user_id \\ nil), do: Quests.generate_daily_progressions!(user_id)
+
+  def generate_achievement_progressions!(user_id), do: Quests.generate_achievement_progressions!(user_id)
+
+  def list_achievement_progressions(user_id), do: Quests.list_progressions(user_id, false)
+
+  def list_daily_quest_progressions(user_id), do: Quests.list_progressions(user_id, true)
 end

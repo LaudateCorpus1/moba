@@ -19,10 +19,13 @@ defmodule MobaWeb.JungleLiveView do
           |> Tutorial.subscribe()
         end
 
+        targets = Game.list_targets(hero)
+        targets = if length(targets) > 0, do: targets, else: Game.generate_targets!(hero) |> Game.list_targets()
+
         {:ok,
          assign(socket,
            current_hero: hero,
-           targets: Game.list_targets(hero),
+           targets: targets,
            tutorial_step: hero.user.tutorial_step,
            pending_battle: Engine.pending_battle(hero.id)
          )}
@@ -48,12 +51,17 @@ defmodule MobaWeb.JungleLiveView do
      |> push_redirect(to: Routes.live_path(socket, MobaWeb.BattleLiveView, battle.id))}
   end
 
+  def handle_event("refresh-targets", _, %{assigns: %{current_hero: hero}} = socket) do
+    hero = Game.refresh_targets!(hero)
+    {:noreply, assign(socket, current_hero: hero, targets: Game.list_targets(hero))}
+  end
+
   def handle_event("league", _, %{assigns: %{current_hero: hero}} = socket) do
     socket = Tutorial.next_step(socket, 10)
 
     battle =
       hero
-      |> Game.redeem_league!()
+      |> Game.prepare_league_challenge!()
       |> Engine.create_league_battle!()
 
     {:noreply, socket |> push_redirect(to: Routes.live_path(socket, MobaWeb.BattleLiveView, battle.id))}

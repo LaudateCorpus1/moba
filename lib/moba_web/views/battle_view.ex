@@ -130,7 +130,7 @@ defmodule MobaWeb.BattleView do
         "You have died to Roshan."
 
       true ->
-        "You have lost the League Challenge. Farm another <span class='text-success'>#{Moba.pve_points_limit()} Jungle Points</span> and try again!"
+        "You have died and lost the League Challenge. Farm a bit more and try again!"
     end
   end
 
@@ -254,13 +254,6 @@ defmodule MobaWeb.BattleView do
         ""
       end
 
-    pve =
-      if rewards.total_pve_points > 0 do
-        content_tag(:span, "#{rewards.total_pve_points} JP", class: "badge badge-light-success")
-      else
-        ""
-      end
-
     points =
       if current_hero.id == battle.attacker_id do
         rewards.attacker_pvp_points
@@ -276,15 +269,11 @@ defmodule MobaWeb.BattleView do
         ""
       end
 
-    content_tag(:div, [xp, gold, pve, pvp])
+    content_tag(:div, [xp, gold, pvp])
   end
 
   def current_hp(hero) do
-    if hero.current_hp + hero.hp_regen > hero.total_hp do
-      hero.total_hp
-    else
-      hero.current_hp - hero.hp_regen
-    end
+    hero.current_hp - hero.hp_regen
   end
 
   def current_mp(hero) do
